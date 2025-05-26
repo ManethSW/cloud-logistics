@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en" x-data="analyticsApp()" x-init="init()" x-cloak>
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Analytics Dashboard – Logistics Portal</title>
+    <script
+        src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6/dist/amazon-cognito-identity.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+    <style>
+        [x-cloak] {
+            display: none !important;
+        }
+
+        .loader {
+            border-top-color: #ffffff;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body class="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center">
+    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-xl transition-all">
+        <div class="mb-6 text-center">
+            <h1 class="text-3xl font-extrabold text-blue-700">Logistics Analytics</h1>
+            <p class="text-gray-500 text-sm">Administrative dashboard</p>
+        </div>
+
+        <div class="text-center mb-6">
+            <p class="text-gray-700 text-sm">
+                Signed in as <span class="font-semibold text-blue-600" x-text="userEmail"></span>
+            </p>
+        </div>
+
+        <div class="mt-8 flex justify-center space-x-4">
+            <button @click="goToQuickSightDashboard"
+                class="bg-blue-600 text-white font-medium py-2 px-6 rounded-lg hover:bg-blue-700 transition flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                <span>Go to Dashboard</span>
+            </button>
+
+            <button :disabled="isLoading" @click="signOut"
+                class="bg-red-500 text-white font-medium py-2 px-6 rounded-lg hover:bg-red-600 transition flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                <span>Sign Out</span>
+                <svg x-show="isLoading" class="w-5 h-5 animate-spin text-white" fill="none" viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('analyticsApp', () => ({
+                userEmail: '',
+                cognitoUser: null,
+                isLoading: false,
+                quickSightAccountName: 'LogisticsPortalQS', // Your QuickSight account name
+                quickSightRegion: 'eu-north-1',             // Your QuickSight region
+
+                poolData: {
+                    UserPoolId: 'eu-north-1_mjFO2q4Uv',
+                    ClientId: '1utjvfrjif09553uifhu8298cc'
+                },
+
+                init() {
+                    this.userPool = new AmazonCognitoIdentity.CognitoUserPool(this.poolData);
+                    const cur = this.userPool.getCurrentUser();
+                    if (!cur) return window.location.href = 'index.html';
+                    this.cognitoUser = cur;
+
+                    cur.getSession((e, s) => {
+                        if (e || !s.isValid()) return window.location.href = 'index.html';
+                        const payload = s.getIdToken().decodePayload();
+                        const groups = payload['cognito:groups'] || [];
+                        if (!groups.includes('LogisticsAdmins')) return window.location.href = 'uploader.html';
+                        this.userEmail = payload.email;
+                    });
+                },
+
+                goToQuickSightDashboard() {
+                    // Construct the QuickSight login URL with the directory_alias (account name)
+                    // This will direct the user to the login page for your specific QuickSight account.
+                    const quickSightLoginUrl = `https://${this.quickSightRegion}.quicksight.aws.amazon.com/sn/start?directory_alias=${this.quickSightAccountName}`;
+                    window.open(quickSightLoginUrl, '_blank'); // Open in a new tab
+                },
+
+                signOut() {
+                    this.isLoading = true;
+                    this.cognitoUser?.signOut();
+                    try {
+                        // AWS.config.credentials might not be loaded or necessary if not using federated identities directly client-side
+                        if (window.AWS && window.AWS.config.credentials) {
+                            window.AWS.config.credentials.clearCachedId();
+                        }
+                    } catch (e) {
+                        console.error("Error clearing credentials:", e);
+                    }
+                    window.location.href = 'index.html';
+                }
+            }));
+        });
+    </script>
+</body>
+
+</html>

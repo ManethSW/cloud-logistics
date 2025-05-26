@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en" x-data="uploaderApp()" x-init="init()" x-cloak>
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Upload Excel – Logistics Portal</title>
+    <script
+        src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6/dist/amazon-cognito-identity.min.js"></script>
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1488.0.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios@0.21.1/dist/axios.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <style>
+        [x-cloak] {
+            display: none !important;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .spin-animation {
+            animation: spin 1s linear infinite;
+        }
+
+        .dropzone {
+            border: 2px dashed #cbd5e0;
+            transition: all 0.3s;
+        }
+
+        .dropzone-active {
+            border-color: #4299e1;
+            background-color: #ebf8ff;
+        }
+
+        .file-input-hidden {
+            width: 0.1px;
+            height: 0.1px;
+            opacity: 0;
+            overflow: hidden;
+            position: absolute;
+            z-index: -1;
+        }
+
+        .progress-bar {
+            transition: width 0.3s ease;
+        }
+
+        .fade-enter-active,
+        .fade-leave-active {
+            transition: opacity 0.3s;
+        }
+
+        .fade-enter,
+        .fade-leave-to {
+            opacity: 0;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-lg transition-all">
+        <!-- Header with user info -->
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800">Excel Uploader</h1>
+                <p class="text-gray-500 text-sm">Upload your logistics data</p>
+            </div>
+            <!-- Show a loader until the companyName is available -->
+            <div x-show="!companyName" class="flex items-center space-x-2">
+                <i class="fas fa-spinner fa-spin text-blue-500"></i>
+                <span class="text-sm text-gray-600">Loading...</span>
+            </div>
+            <div x-show="companyName" class="flex flex-col items-end">
+                <span class="text-sm font-medium text-blue-600" x-text="companyName"></span>
+                <span class="text-xs text-gray-500" x-text="userEmail"></span>
+            </div>
+        </div>
+
+        <!-- Custom file upload area -->
+        <div class="dropzone rounded-lg p-6 text-center mb-6" :class="{ 'dropzone-active': isDragging }"
+            x-on:dragover.prevent="isDragging = true" x-on:dragleave.prevent="isDragging = false"
+            x-on:drop.prevent="handleFileDrop($event)">
+
+            <input id="file-upload" type="file" @change="handleFileSelect($event)" accept=".xlsx,.xls"
+                class="file-input-hidden" />
+
+            <template x-if="!file">
+                <div class="py-6">
+                    <i class="fas fa-file-excel text-4xl text-gray-300 mb-3"></i>
+                    <h3 class="font-medium text-gray-700 mb-2">Drop your Excel file here</h3>
+                    <p class="text-gray-500 text-sm mb-3">or</p>
+                    <label for="file-upload"
+                        class="bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-2 rounded-lg cursor-pointer transition-colors">
+                        Browse files
+                    </label>
+                    <p class="text-xs text-gray-400 mt-3">Only .xlsx and .xls files allowed</p>
+                </div>
+            </template>
+
+            <template x-if="file">
+                <div class="flex items-center p-4 bg-gray-50 rounded-lg">
+                    <i class="fas fa-file-excel text-green-500 text-xl mr-3"></i>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-gray-800 truncate" x-text="file.name"></p>
+                        <p class="text-xs text-gray-500" x-text="formatFileSize(file.size)"></p>
+                    </div>
+                    <button @click.prevent="file = null" class="text-gray-400 hover:text-red-500 ml-2">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </template>
+        </div>
+
+        <!-- Upload progress (shown when uploading) -->
+        <div x-show="isUploading" class="mb-6">
+            <div class="flex justify-between text-xs text-gray-600 mb-1">
+                <span>Uploading...</span>
+                <span x-text="uploadProgress + '%'"></span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+                <div class="bg-green-500 h-2 rounded-full progress-bar" :style="`width: ${uploadProgress}%`"></div>
+            </div>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="flex space-x-3">
+            <button :disabled="isUploading || !file" @click="uploadFile"
+                class="flex-1 bg-green-600 text-white font-medium py-3 px-4 rounded-lg hover:bg-green-700 transition flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                <span>Upload File</span>
+                <i x-show="isUploading" class="fas fa-circle-notch spin-animation ml-2"></i>
+            </button>
+
+            <button @click="signOut"
+                class="bg-gray-200 text-gray-700 font-medium py-3 px-5 rounded-lg hover:bg-gray-300 transition">
+                <i class="fas fa-sign-out-alt"></i>
+            </button>
+        </div>
+
+        <!-- Status messages -->
+        <div x-show="message" x-transition:enter="fade-enter-active" x-transition:leave="fade-leave-active"
+            class="mt-4 p-3 rounded-lg text-sm flex items-start"
+            :class="messageType === 'error' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'">
+            <i class="mt-0.5 mr-2"
+                :class="messageType === 'error' ? 'fas fa-exclamation-circle' : 'fas fa-check-circle'"></i>
+            <span x-text="message"></span>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('uploaderApp', () => ({
+                file: null,
+                message: '',
+                messageType: '',
+                userEmail: '',
+                companyName: '',
+                isUploading: false,
+                cognitoUser: null,
+                isDragging: false,
+                uploadProgress: 0,
+
+                poolData: {
+                    UserPoolId: 'eu-north-1_mjFO2q4Uv',
+                    ClientId: '1utjvfrjif09553uifhu8298cc'
+                },
+                identityPoolId: 'eu-north-1:e719a5c0-8093-4110-85ef-13519a8276b1',
+                bucketName: 'maneth-logistics',
+                companiesTableName: 'TransportCompanies',
+
+                init() {
+                    AWS.config.region = 'eu-north-1';
+                    this.userPool = new AmazonCognitoIdentity.CognitoUserPool(this.poolData);
+                    const cur = this.userPool.getCurrentUser();
+                    if (!cur) return window.location.href = 'index.html';
+
+                    this.cognitoUser = cur;
+                    cur.getSession((err, sess) => {
+                        if (err || !sess.isValid()) return window.location.href = 'index.html';
+
+                        // grab token & set up Identity credentials
+                        AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+                            IdentityPoolId: this.identityPoolId,
+                            Logins: {
+                                [`cognito-idp.${AWS.config.region}.amazonaws.com/${this.poolData.UserPoolId}`]:
+                                    sess.getIdToken().getJwtToken()
+                            }
+                        });
+
+                        AWS.config.credentials.refresh(async credErr => {
+                            if (credErr) {
+                                console.error('Credential refresh error', credErr);
+                                return;
+                            }
+
+                            // ➊ Log IdentityId
+                            console.log('🔑 Cognito IdentityId:', AWS.config.credentials.identityId);
+
+                            // ➋ Call STS.getCallerIdentity to see which role ARN was assumed
+                            const sts = new AWS.STS();
+                            sts.getCallerIdentity({}, (stsErr, data) => {
+                                if (stsErr) console.error('STS error', stsErr);
+                                else console.log('🎭 AssumedRole ARN:', data.Arn);
+                            });
+
+                            // now safe to call DynamoDB…
+                            const docClient = new AWS.DynamoDB.DocumentClient();
+                            const companyId = sess.getIdToken().decodePayload()['custom:companyId'];
+                            try {
+                                const resp = await docClient.get({
+                                    TableName: this.companiesTableName,
+                                    Key: { companyId }
+                                }).promise();
+                                this.companyName = resp.Item?.name || '';
+                            } catch (dbErr) {
+                                console.error('Company fetch error', dbErr);
+                            }
+                        });
+                    });
+                },
+
+                handleFileDrop(event) {
+                    this.isDragging = false;
+                    const droppedFiles = event.dataTransfer.files;
+                    if (droppedFiles.length > 0) {
+                        const file = droppedFiles[0];
+                        if (this.validateFile(file)) {
+                            this.file = file;
+                            this.message = '';
+                        }
+                    }
+                },
+
+                handleFileSelect(event) {
+                    const selectedFile = event.target.files[0];
+                    if (selectedFile && this.validateFile(selectedFile)) {
+                        this.file = selectedFile;
+                        this.message = '';
+                    }
+                },
+
+                validateFile(file) {
+                    const validTypes = [
+                        'application/vnd.ms-excel',
+                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    ];
+                    const validExtensions = ['.xlsx', '.xls'];
+
+                    // Check file extension
+                    const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+                    const isValidExtension = validExtensions.includes(fileExt);
+
+                    // Check file type (MIME)
+                    const isValidType = validTypes.includes(file.type);
+
+                    if (!isValidExtension || !isValidType) {
+                        this.message = 'Please select a valid Excel file (.xlsx or .xls)';
+                        this.messageType = 'error';
+                        return false;
+                    }
+
+                    // Check file size (10MB limit)
+                    if (file.size > 10 * 1024 * 1024) {
+                        this.message = 'File size exceeds 10MB limit';
+                        this.messageType = 'error';
+                        return false;
+                    }
+
+                    return true;
+                },
+
+                formatFileSize(bytes) {
+                    if (bytes === 0) return '0 Bytes';
+                    const k = 1024;
+                    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+                },
+
+                signOut() {
+                    this.cognitoUser?.signOut();
+                    if (AWS.config.credentials) {
+                        try { AWS.config.credentials.clearCachedId(); } catch { }
+                    }
+                    window.location.href = 'index.html';
+                },
+
+                uploadFile() {
+                    if (!this.file) {
+                        this.message = 'Please select an Excel file first';
+                        this.messageType = 'error';
+                        return;
+                    }
+
+                    const session = this.cognitoUser.getSignInUserSession();
+                    if (!session || !session.isValid()) {
+                        this.message = 'Session expired—please sign in again';
+                        this.messageType = 'error';
+                        return;
+                    }
+
+                    this.isUploading = true;
+                    this.uploadProgress = 0; // Reset progress
+
+                    // --- REMOVE THIS BLOCK ---
+                    // // simulate progress up to 80%
+                    // const progressInterval = setInterval(() => {
+                    //     if (this.uploadProgress < 80) {
+                    //         this.uploadProgress += 5;
+                    //     }
+                    // }, 200);
+                    // -------------------------
+
+                    // Use a variable to track the final progress interval if needed for backend processing
+                    let backendProcessingInterval;
+
+                    // read file as Base64
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const base64Data = reader.result.split(',')[1]; // strip "data:*/*;base64,"
+
+                        const payload = {
+                            fileName: this.file.name,
+                            fileData: base64Data,
+                            date: new Date().toISOString().slice(0, 10),
+                        };
+
+                        axios.post(
+                            'https://ic8g1nc632.execute-api.eu-north-1.amazonaws.com/dev/upload',
+                            payload,
+                            {
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': session.getIdToken().getJwtToken(),
+                                },
+                                onUploadProgress: evt => {
+                                    const pct = Math.floor((evt.loaded / evt.total) * 100);
+                                    // Map network progress (0-100%) to the main upload phase (e.g., 0-95%)
+                                    this.uploadProgress = Math.min(95, pct); // Still cap at 95% for backend processing
+                                }
+                            }
+                        )
+                            .then(() => {
+                                // clearInterval(progressInterval); // This line is now redundant as progressInterval is removed
+
+                                // --- Simulate the final backend processing (95% to 100%) ---
+                                // Start from where network upload left off (max 95%) and animate to 100%
+                                let currentProgress = this.uploadProgress;
+                                const targetProgress = 100;
+                                const duration = 500; // milliseconds for the final animation
+                                const steps = 10;
+                                const intervalTime = duration / steps;
+                                const increment = (targetProgress - currentProgress) / steps;
+
+                                backendProcessingInterval = setInterval(() => {
+                                    currentProgress += increment;
+                                    if (currentProgress >= targetProgress) {
+                                        currentProgress = targetProgress;
+                                        clearInterval(backendProcessingInterval);
+                                    }
+                                    this.uploadProgress = Math.floor(currentProgress);
+                                }, intervalTime);
+                                // -------------------------------------------------------------
+
+                                setTimeout(() => {
+                                    // Ensure 100% is set
+                                    this.uploadProgress = 100;
+                                    clearInterval(backendProcessingInterval); // Clear in case timeout fires before interval finishes
+
+                                    this.isUploading = false;
+                                    this.message = `Successfully uploaded for ${this.companyName} on ${payload.date}`;
+                                    this.messageType = 'success';
+                                    this.file = null;
+                                }, 800); // This setTimeout can be slightly adjusted based on the backend processing simulation. Make it slightly longer than the backend processing interval.
+                            })
+                            .catch(err => {
+                                // clearInterval(progressInterval); // This line is now redundant
+                                clearInterval(backendProcessingInterval); // Clear any ongoing backend simulation
+                                this.isUploading = false;
+                                console.error('Upload API error', err);
+                                this.message = err.response?.data?.message || err.message;
+                                this.messageType = 'error';
+                            });
+                    };
+
+                    // trigger read
+                    reader.onerror = e => {
+                        // clearInterval(progressInterval); // This line is now redundant
+                        clearInterval(backendProcessingInterval); // Clear any ongoing backend simulation
+                        this.isUploading = false;
+                        console.error('FileReader error', e);
+                        this.message = 'Failed to read file';
+                        this.messageType = 'error';
+                    };
+                    reader.readAsDataURL(this.file);
+                },
+            }));
+        });
+    </script>
+</body>
+
+</html>
