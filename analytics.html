@@ -101,7 +101,7 @@
                     });
                 },
                 goToQuickSightDashboard() {
-                    const url = `https://${this.quickSightRegion}.quicksight.aws.amazon.com/sn/dashboards/${dashboardId}?directory_alias=${this.quickSightAccountName}`;
+                    const url = `https://${this.quickSightRegion}.quicksight.aws.amazon.com/sn/dashboards/${this.dashboardId}?directory_alias=${this.quickSightAccountName}`;
                     window.open(url, '_blank');
                 },
                 signOut() {
