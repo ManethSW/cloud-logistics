@@ -5,17 +5,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Sign In – Logistics Portal</title>
-
-    <!-- 1) AWS SDK must come first -->
     <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1488.0.min.js"></script>
-
-    <!-- 2) Amazon Cognito Identity JS -->
     <script
         src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6/dist/amazon-cognito-identity.min.js"></script>
-
-    <!-- 3) Alpine.js (deferred) -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
     <style>
         [x-cloak] {
@@ -35,16 +28,13 @@
     </style>
 </head>
 
-<body class="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center">
-    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md transition-all">
-
-        <!-- Heading & dynamic subtitle -->
+<body class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-lg transition-all">
         <div class="mb-6 text-center">
             <h1 class="text-3xl font-extrabold text-blue-700">Logistics Portal</h1>
             <p class="text-gray-500" x-text="stateLabel"></p>
         </div>
 
-        <!-- 1) Sign In -->
         <template x-if="view === 'signIn'">
             <div>
                 <input x-model="email" type="email" placeholder="Email"
@@ -68,7 +58,6 @@
             </div>
         </template>
 
-        <!-- 2) New Password Required -->
         <template x-if="view === 'newPassword'">
             <div>
                 <input x-model="newPassword" type="password" placeholder="New Password"
@@ -85,7 +74,6 @@
             </div>
         </template>
 
-        <!-- 3) Forgot Password: Request Code -->
         <template x-if="view === 'forgotRequest'">
             <div>
                 <input x-model="email" type="email" placeholder="Email"
@@ -102,7 +90,6 @@
             </div>
         </template>
 
-        <!-- 4) Forgot Password: Submit Code -->
         <template x-if="view === 'forgotSubmit'">
             <div>
                 <input x-model="resetCode" type="text" placeholder="Confirmation Code"
@@ -120,159 +107,145 @@
                 <p x-show="message" x-text="message" class="mt-4 text-sm text-red-600 text-center"></p>
             </div>
         </template>
-
     </div>
 
-    <script>
-        document.addEventListener('alpine:init', () => {
-            Alpine.data('authApp', () => ({
-                // UI state
-                view: 'signIn',
-                stateLabel: 'Sign in to continue',
-                email: '', password: '',
-                newPassword: '', resetCode: '',
-                isLoading: false, message: '',
-                cognitoUser: null, userAttributes: {},
-
-                // Cognito config
-                poolData: {
-                    UserPoolId: 'eu-north-1_mjFO2q4Uv',
-                    ClientId: '1utjvfrjif09553uifhu8298cc'
-                },
-
-                init() {
-                    // Ensure AWS global exists
-                    if (typeof window.AWS === 'undefined') {
-                        console.error('AWS SDK not loaded');
-                        this.message = 'Configuration error—please refresh.';
-                        return;
-                    }
-                    AWS.config.region = 'eu-north-1';
-                    this.userPool = new AmazonCognitoIdentity.CognitoUserPool(this.poolData);
-
-                    const u = this.userPool.getCurrentUser();
-                    if (u) {
-                        u.getSession((err, sess) => {
-                            if (sess?.isValid()) {
-                                const groups = sess.getIdToken().decodePayload()['cognito:groups'] || [];
-                                window.location.href = groups.includes('LogisticsAdmins')
-                                    ? 'analytics.html' : 'uploader.html';
-                            }
-                        });
-                    }
-                },
-
-                // 1) Sign In
-                signIn() {
-                    if (!this.email || !this.password) {
-                        this.message = 'Please enter both email and password.';
-                        return;
-                    }
-                    if (!/\S+@\S+\.\S+/.test(this.email)) {
-                        this.message = 'Please enter a valid email address.';
-                        return;
-                    }
-                    this.message = ''; this.isLoading = true;
-                    const authDetails = new AmazonCognitoIdentity.AuthenticationDetails({
-                        Username: this.email, Password: this.password
+        <script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('authApp', () => ({
+            view: 'signIn',
+            stateLabel: 'Sign in to continue',
+            email: '', password: '', newPassword: '', resetCode: '',
+            isLoading: false, message: '',
+            cognitoUser: null, userAttributes: {},
+            poolData: {
+                UserPoolId: 'eu-north-1_mjFO2q4Uv',
+                ClientId: '1utjvfrjif09553uifhu8298cc'
+            },
+    
+            init() {
+                if (!window.AWS) {
+                    console.error('AWS SDK not loaded');
+                    this.message = 'Configuration error—please refresh.';
+                    return;
+                }
+                AWS.config.region = 'eu-north-1';
+                this.userPool = new AmazonCognitoIdentity.CognitoUserPool(this.poolData);
+                const u = this.userPool.getCurrentUser();
+                if (u) {
+                    u.getSession((err, sess) => {
+                        if (sess?.isValid()) this.redirectByGroup(sess);
                     });
-                    this.cognitoUser = new AmazonCognitoIdentity.CognitoUser({
-                        Username: this.email, Pool: this.userPool
-                    });
-                    this.cognitoUser.authenticateUser(authDetails, {
+                }
+            },
+    
+            signIn() {
+                if (!this.email || !this.password)
+                    return this.setMsg('Please enter both email and password.');
+                if (!/\S+@\S+\.\S+/.test(this.email))
+                    return this.setMsg('Please enter a valid email address.');
+                this.message = ''; this.isLoading = true;
+                const authDetails = new AmazonCognitoIdentity.AuthenticationDetails({
+                    Username: this.email, Password: this.password
+                });
+                this.cognitoUser = new AmazonCognitoIdentity.CognitoUser({
+                    Username: this.email, Pool: this.userPool
+                });
+                this.cognitoUser.authenticateUser(authDetails, {
+                    onSuccess: res => {
+                        this.isLoading = false;
+                        this.redirectByGroup(res);
+                    },
+                    newPasswordRequired: (attrs) => {
+                        this.isLoading = false;
+                        this.userAttributes = attrs;
+                        this.view = 'newPassword';
+                        this.stateLabel = 'Set your new password';
+                    },
+                    onFailure: err => {
+                        this.isLoading = false;
+                        if (['UserNotFoundException', 'NotAuthorizedException'].includes(err.code))
+                            this.setMsg('Incorrect email or password.');
+                        else if (err.code === 'UserNotConfirmedException')
+                            this.setMsg('Your account is not confirmed. Please check your email for a verification code.');
+                        else if (err.code === 'PasswordResetRequiredException') {
+                            this.view = 'forgotRequest';
+                            this.stateLabel = 'Reset your password';
+                            this.setMsg('Your account requires a password reset.');
+                        } else
+                            this.setMsg(err.message || 'An unexpected error occurred. Please try again.');
+                    }
+                });
+            },
+    
+            completeNewPassword() {
+                this.message = ''; this.isLoading = true;
+                this.cognitoUser.completeNewPasswordChallenge(
+                    this.newPassword, this.userAttributes, {
                         onSuccess: res => {
                             this.isLoading = false;
-                            const groups = res.getIdToken().decodePayload()['cognito:groups'] || [];
-                            window.location.href = groups.includes('LogisticsAdmins')
-                                ? 'analytics.html' : 'uploader.html';
-                        },
-                        newPasswordRequired: (attrs, reqAttrs) => {
-                            this.isLoading = false;
-                            this.userAttributes = attrs;
-                            this.view = 'newPassword';
-                            this.stateLabel = 'Set your new password';
+                            this.redirectByGroup(res);
                         },
                         onFailure: err => {
                             this.isLoading = false;
-                            if (err.code === 'UserNotFoundException' || err.code === 'NotAuthorizedException') {
-                                this.message = 'Incorrect email or password.';
-                            } else if (err.code === 'UserNotConfirmedException') {
-                                this.message = 'Your account is not confirmed. Please check your email for a verification code.';
-                            } else if (err.code === 'PasswordResetRequiredException') {
-                                this.view = 'forgotRequest';
-                                this.stateLabel = 'Reset your password';
-                                this.message = 'Your account requires a password reset.';
-                            } else {
-                                this.message = err.message || 'An unexpected error occurred. Please try again.';
-                            }
-                        }
-                    });
-                },
-
-                // 2) Complete New Password challenge
-                completeNewPassword() {
-                    this.message = ''; this.isLoading = true;
-                    this.cognitoUser.completeNewPasswordChallenge(
-                        this.newPassword, this.userAttributes, {
-                        onSuccess: res => {
-                            this.isLoading = false;
-                            const groups = res.getIdToken().decodePayload()['cognito:groups'] || [];
-                            window.location.href = groups.includes('LogisticsAdmins')
-                                ? 'analytics.html' : 'uploader.html';
-                        },
-                        onFailure: err => {
-                            this.isLoading = false;
-                            this.message = err.message || JSON.stringify(err);
+                            this.setMsg(err.message || JSON.stringify(err));
                         }
                     }
-                    );
-                },
-
-                // 3) Forgot Password → send code
-                startForgotPassword() {
-                    this.view = 'forgotRequest';
-                    this.stateLabel = 'Forgot your password?';
-                    this.message = '';
-                },
-                sendResetCode() {
-                    this.message = ''; this.isLoading = true;
-                    this.cognitoUser = new AmazonCognitoIdentity.CognitoUser({
-                        Username: this.email, Pool: this.userPool
-                    });
-                    this.cognitoUser.forgotPassword({
-                        onFailure: err => {
-                            this.isLoading = false;
-                            this.message = err.message || JSON.stringify(err);
-                        },
-                        inputVerificationCode: () => {
-                            this.isLoading = false;
-                            this.view = 'forgotSubmit';
-                            this.stateLabel = 'Enter code & new password';
-                        }
-                    });
-                },
-
-                // 4) Forgot Password → confirm code
-                confirmResetPassword() {
-                    this.message = ''; this.isLoading = true;
-                    this.cognitoUser.confirmPassword(
-                        this.resetCode, this.newPassword, {
+                );
+            },
+    
+            startForgotPassword() {
+                this.view = 'forgotRequest';
+                this.stateLabel = 'Forgot your password?';
+                this.message = '';
+            },
+            sendResetCode() {
+                this.message = ''; this.isLoading = true;
+                this.cognitoUser = new AmazonCognitoIdentity.CognitoUser({
+                    Username: this.email, Pool: this.userPool
+                });
+                this.cognitoUser.forgotPassword({
+                    onFailure: err => {
+                        this.isLoading = false;
+                        this.setMsg(err.message || JSON.stringify(err));
+                    },
+                    inputVerificationCode: () => {
+                        this.isLoading = false;
+                        this.view = 'forgotSubmit';
+                        this.stateLabel = 'Enter code & new password';
+                    }
+                });
+            },
+    
+            confirmResetPassword() {
+                this.message = ''; this.isLoading = true;
+                this.cognitoUser.confirmPassword(
+                    this.resetCode, this.newPassword, {
                         onSuccess: () => {
                             this.isLoading = false;
                             this.view = 'signIn';
                             this.stateLabel = 'Sign in to continue';
                             this.password = '';
-                            this.message = 'Password reset successful—please sign in.';
+                            this.setMsg('Password reset successful—please sign in.');
                         },
                         onFailure: err => {
                             this.isLoading = false;
-                            this.message = err.message || JSON.stringify(err);
+                            this.setMsg(err.message || JSON.stringify(err));
                         }
                     }
-                    );
-                }
-            }));
-        });
+                );
+            },
+    
+            redirectByGroup(sess) {
+                const groups = sess.getIdToken().decodePayload()['cognito:groups'] || [];
+                window.location.href = groups.includes('LogisticsAdmins')
+                    ? 'analytics.html' : 'uploader.html';
+            },
+    
+            setMsg(msg) {
+                this.message = msg;
+            }
+        }));
+    });
     </script>
 </body>
 
