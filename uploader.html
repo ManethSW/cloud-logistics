@@ -2,319 +2,284 @@
 <html lang="en" x-data="uploaderApp()" x-init="init()" x-cloak>
 
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Excel Uploader - Logistics</title>
-    <script
-        src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6/dist/amazon-cognito-identity.min.js"></script>
-    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1488.0.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/axios@0.21.1/dist/axios.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-    <style>
-        [x-cloak] {
-            display: none !important;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Excel Uploader – Logistics</title>
 
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
+  <!-- Cognito & AWS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6/dist/amazon-cognito-identity.min.js"></script>
+  <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1488.0.min.js"></script>
 
-        .spin-animation {
-            animation: spin 1s linear infinite;
-        }
+  <!-- Alpine & Axios -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios@0.21.1/dist/axios.min.js"></script>
 
-        .dropzone {
-            border: 2px dashed #cbd5e0;
-            transition: all 0.3s;
-        }
+  <!-- Tailwind & Font Awesome -->
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 
-        .dropzone-active {
-            border-color: #4299e1;
-            background-color: #ebf8ff;
-        }
-
-        .file-input-hidden {
-            width: 0.1px;
-            height: 0.1px;
-            opacity: 0;
-            overflow: hidden;
-            position: absolute;
-            z-index: -1;
-        }
-
-        .progress-bar {
-            transition: width 0.3s ease;
-        }
-
-        .fade-enter-active,
-        .fade-leave-active {
-            transition: opacity 0.3s;
-        }
-
-        .fade-enter,
-        .fade-leave-to {
-            opacity: 0;
-        }
-    </style>
+  <style>
+    [x-cloak] { display: none !important; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin-animation { animation: spin 1s linear infinite; }
+    .dropzone { border: 2px dashed #cbd5e0; transition: all 0.3s; }
+    .dropzone-active { border-color: #4299e1; background-color: #ebf8ff; }
+    .file-input-hidden { width:0.1px; height:0.1px; opacity:0; overflow:hidden; position:absolute; z-index:-1; }
+    .progress-bar { transition: width 0.3s ease; }
+    .fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
+    .fade-enter, .fade-leave-to { opacity: 0; }
+  </style>
 </head>
 
 <body class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-    <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-lg transition-all">
-        <div class="flex items-center justify-between mb-6">
-            <div>
-                <h1 class="text-2xl font-bold text-gray-800">Excel Uploader</h1>
-                <p class="text-gray-500 text-sm">Upload your logistics data</p>
-            </div>
-            <div x-show="!companyName" class="flex items-center space-x-2">
-                <i class="fas fa-spinner fa-spin text-blue-500"></i>
-                <span class="text-sm text-gray-600">Loading...</span>
-            </div>
-            <div x-show="companyName" class="flex flex-col items-end">
-                <span class="text-sm font-medium text-blue-600" x-text="companyName"></span>
-                <span class="text-xs text-gray-500" x-text="userEmail"></span>
-            </div>
-        </div>
+  <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-lg transition-all">
 
-        <div class="dropzone rounded-lg p-6 text-center mb-6" :class="{ 'dropzone-active': isDragging }"
-            x-on:dragover.prevent="isDragging = true" x-on:dragleave.prevent="isDragging = false"
-            x-on:drop.prevent="handleFileDrop($event)">
-            <input id="file-upload" type="file" @change="handleFileSelect($event)" accept=".xlsx,.xls"
-                class="file-input-hidden" />
-            <template x-if="!file">
-                <div class="py-6">
-                    <i class="fas fa-file-excel text-4xl text-gray-300 mb-3"></i>
-                    <h3 class="font-medium text-gray-700 mb-2">Drop your Excel file here</h3>
-                    <p class="text-gray-500 text-sm mb-3">or</p>
-                    <label for="file-upload"
-                        class="bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-2 rounded-lg cursor-pointer transition-colors">
-                        Browse files
-                    </label>
-                    <p class="text-xs text-gray-400 mt-3">Only .xlsx and .xls files allowed</p>
-                </div>
-            </template>
-            <template x-if="file">
-                <div class="flex items-center p-4 bg-gray-50 rounded-lg">
-                    <i class="fas fa-file-excel text-green-500 text-xl mr-3"></i>
-                    <div class="flex-1 min-w-0">
-                        <p class="text-sm font-medium text-gray-800 truncate" x-text="file.name"></p>
-                        <p class="text-xs text-gray-500" x-text="formatFileSize(file.size)"></p>
-                    </div>
-                    <button @click.prevent="file = null" class="text-gray-400 hover:text-red-500 ml-2">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            </template>
-        </div>
-
-        <div x-show="isUploading" class="mb-6">
-            <div class="flex justify-between text-xs text-gray-600 mb-1">
-                <span>Uploading...</span>
-                <span x-text="uploadProgress + '%'"></span>
-            </div>
-            <div class="w-full bg-gray-200 rounded-full h-2">
-                <div class="bg-green-500 h-2 rounded-full progress-bar" :style="`width: ${uploadProgress}%`"></div>
-            </div>
-        </div>
-
-        <div class="flex space-x-3">
-            <button :disabled="isUploading || !file" @click="uploadFile"
-                class="flex-1 bg-green-600 text-white font-medium py-3 px-4 rounded-lg hover:bg-green-700 transition flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                <span>Upload File</span>
-                <i x-show="isUploading" class="fas fa-circle-notch spin-animation ml-2"></i>
-            </button>
-            <button @click="signOut"
-                class="bg-gray-200 text-gray-700 font-medium py-3 px-5 rounded-lg hover:bg-gray-300 transition">
-                <i class="fas fa-sign-out-alt"></i>
-            </button>
-        </div>
-
-        <div x-show="message" x-transition:enter="fade-enter-active" x-transition:leave="fade-leave-active"
-            class="mt-4 p-3 rounded-lg text-sm flex items-start"
-            :class="messageType === 'error' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'">
-            <i class="mt-0.5 mr-2"
-                :class="messageType === 'error' ? 'fas fa-exclamation-circle' : 'fas fa-check-circle'"></i>
-            <span x-text="message"></span>
-        </div>
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-800">Excel Uploader</h1>
+        <p class="text-gray-500 text-sm">Upload your logistics data</p>
+      </div>
+      <div x-show="!companyName" class="flex items-center space-x-2">
+        <i class="fas fa-spinner fa-spin text-blue-500"></i>
+        <span class="text-sm text-gray-600">Loading...</span>
+      </div>
+      <div x-show="companyName" class="flex flex-col items-end">
+        <span class="text-sm font-medium text-blue-600" x-text="companyName"></span>
+        <span class="text-xs text-gray-500" x-text="userEmail"></span>
+      </div>
     </div>
 
-    <script>
-        document.addEventListener('alpine:init', () => {
-            Alpine.data('uploaderApp', () => ({
-                file: null,
-                message: '',
-                messageType: '',
-                userEmail: '',
-                companyName: '',
-                isUploading: false,
-                cognitoUser: null,
-                isDragging: false,
-                uploadProgress: 0,
-                poolData: {
-                    UserPoolId: 'eu-north-1_mjFO2q4Uv',
-                    ClientId: '1utjvfrjif09553uifhu8298cc'
-                },
-                identityPoolId: 'eu-north-1:e719a5c0-8093-4110-85ef-13519a8276b1',
-                companiesTableName: 'TransportCompanies',
+    <!-- Dropzone -->
+    <div class="dropzone rounded-lg p-6 text-center mb-6" 
+         :class="{ 'dropzone-active': isDragging }"
+         x-on:dragover.prevent="isDragging = true" 
+         x-on:dragleave.prevent="isDragging = false"
+         x-on:drop.prevent="handleFileDrop($event)">
+      <input id="file-upload" type="file" accept=".xlsx,.xls" 
+             @change="handleFileSelect($event)" 
+             class="file-input-hidden" />
 
-                init() {
-                    AWS.config.region = 'eu-north-1';
-                    this.userPool = new AmazonCognitoIdentity.CognitoUserPool(this.poolData);
-                    const cur = this.userPool.getCurrentUser();
-                    if (!cur) return window.location.href = 'index.html';
-                    this.cognitoUser = cur;
-                    cur.getSession((err, sess) => {
-                        if (err || !sess.isValid()) return window.location.href = 'index.html';
-                        AWS.config.credentials = new AWS.CognitoIdentityCredentials({
-                            IdentityPoolId: this.identityPoolId,
-                            Logins: {
-                                [`cognito-idp.${AWS.config.region}.amazonaws.com/${this.poolData.UserPoolId}`]:
-                                    sess.getIdToken().getJwtToken()
-                            }
-                        });
-                        AWS.config.credentials.refresh(async credErr => {
-                            if (credErr) return console.error('Credential refresh error', credErr);
-                            console.log('🔑 Cognito IdentityId:', AWS.config.credentials.identityId);
-                            new AWS.STS().getCallerIdentity({}, (stsErr, data) =>
-                                stsErr ? console.error('STS error', stsErr) : console.log('🎭 AssumedRole ARN:', data.Arn)
-                            );
-                            try {
-                                const payload = sess.getIdToken().decodePayload();
-                                this.userEmail = payload.email;
-                                const companyId = payload['custom:companyId'];
-                                const resp = await new AWS.DynamoDB.DocumentClient().get({
-                                    TableName: this.companiesTableName,
-                                    Key: { companyId }
-                                }).promise();
-                                this.companyName = resp.Item?.name || '';
-                            } catch (dbErr) {
-                                console.error('Company fetch error', dbErr);
-                            }
-                        });
-                    });
-                },
+      <template x-if="!file">
+        <div class="py-6">
+          <i class="fas fa-file-excel text-4xl text-gray-300 mb-3"></i>
+          <h3 class="font-medium text-gray-700 mb-2">Drop your Excel file here</h3>
+          <p class="text-gray-500 text-sm mb-3">or</p>
+          <label for="file-upload"
+                 class="bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-2 rounded-lg cursor-pointer transition-colors">
+            Browse files
+          </label>
+          <p class="text-xs text-gray-400 mt-3">Only .xlsx and .xls files allowed</p>
+        </div>
+      </template>
 
-                handleFileDrop(e) {
-                    this.isDragging = false;
-                    const file = e.dataTransfer.files[0];
-                    if (file && this.validateFile(file)) {
-                        this.file = file;
-                        this.message = '';
-                    }
-                },
+      <template x-if="file">
+        <div class="flex items-center p-4 bg-gray-50 rounded-lg">
+          <i class="fas fa-file-excel text-green-500 text-xl mr-3"></i>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium text-gray-800 truncate" x-text="file.name"></p>
+            <p class="text-xs text-gray-500" x-text="formatFileSize(file.size)"></p>
+          </div>
+          <button @click.prevent="file = null" class="text-gray-400 hover:text-red-500 ml-2">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+      </template>
+    </div>
 
-                handleFileSelect(e) {
-                    const file = e.target.files[0];
-                    if (file && this.validateFile(file)) {
-                        this.file = file;
-                        this.message = '';
-                    }
-                },
+    <!-- Progress -->
+    <div x-show="isUploading" class="mb-6">
+      <div class="flex justify-between text-xs text-gray-600 mb-1">
+        <span>Uploading...</span>
+        <span x-text="uploadProgress + '%'"></span>
+      </div>
+      <div class="w-full bg-gray-200 rounded-full h-2">
+        <div class="bg-green-500 h-2 rounded-full progress-bar" 
+             :style="`width: ${uploadProgress}%`"></div>
+      </div>
+    </div>
 
-                validateFile(file) {
-                    const validTypes = [
-                        'application/vnd.ms-excel',
-                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-                    ];
-                    const validExtensions = ['.xlsx', '.xls'];
-                    const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
-                    if (!validExtensions.includes(ext) || !validTypes.includes(file.type)) {
-                        this.message = 'Please select a valid Excel file (.xlsx or .xls)';
-                        this.messageType = 'error';
-                        return false;
-                    }
-                    if (file.size > 10 * 1024 * 1024) {
-                        this.message = 'File size exceeds 10MB limit';
-                        this.messageType = 'error';
-                        return false;
-                    }
-                    return true;
-                },
+    <!-- Actions -->
+    <div class="flex space-x-3">
+      <button :disabled="isUploading || !file" @click="uploadFile"
+              class="flex-1 bg-green-600 text-white font-medium py-3 px-4 rounded-lg 
+                     hover:bg-green-700 transition flex items-center justify-center space-x-2
+                     disabled:opacity-50 disabled:cursor-not-allowed">
+        <span>Upload File</span>
+        <i x-show="isUploading" class="fas fa-circle-notch spin-animation ml-2"></i>
+      </button>
+      <button @click="signOut"
+              class="bg-gray-200 text-gray-700 font-medium py-3 px-5 rounded-lg hover:bg-gray-300 transition">
+        <i class="fas fa-sign-out-alt"></i>
+      </button>
+    </div>
 
-                formatFileSize(bytes) {
-                    if (!bytes) return '0 Bytes';
-                    const k = 1024, sizes = ['Bytes', 'KB', 'MB', 'GB'];
-                    const i = Math.floor(Math.log(bytes) / Math.log(k));
-                    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
-                },
+    <!-- Status Message -->
+    <div x-show="message" x-transition:enter="fade-enter-active" x-transition:leave="fade-leave-active"
+         class="mt-4 p-3 rounded-lg text-sm flex items-start"
+         :class="messageType==='error' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'">
+      <i class="mt-0.5 mr-2"
+         :class="messageType==='error' ? 'fas fa-exclamation-circle' : 'fas fa-check-circle'"></i>
+      <span x-text="message"></span>
+    </div>
 
-                signOut() {
-                    this.cognitoUser?.signOut();
-                    try { AWS.config.credentials?.clearCachedId(); } catch { }
-                    window.location.href = 'index.html';
-                },
+  </div>
 
-                uploadFile() {
-                    if (!this.file) return this.setMsg('Please select an Excel file first', 'error');
-                    const session = this.cognitoUser.getSignInUserSession();
-                    if (!session || !session.isValid()) return this.setMsg('Session expired—please sign in again', 'error');
-                    this.isUploading = true;
-                    this.uploadProgress = 0;
-                    let backendInterval;
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                        const base64Data = reader.result.split(',')[1];
-                        const payload = {
-                            fileName: this.file.name,
-                            fileData: base64Data,
-                            date: new Date().toISOString().slice(0, 10),
-                        };
-                        axios.post(
-                            'https://ic8g1nc632.execute-api.eu-north-1.amazonaws.com/dev/upload',
-                            payload,
-                            {
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'Authorization': session.getIdToken().getJwtToken(),
-                                },
-                                onUploadProgress: evt => {
-                                    this.uploadProgress = Math.min(95, Math.floor((evt.loaded / evt.total) * 100));
-                                }
-                            }
-                        ).then(() => {
-                            let current = this.uploadProgress, steps = 10, duration = 500, inc = (100 - current) / steps;
-                            backendInterval = setInterval(() => {
-                                current += inc;
-                                if (current >= 100) {
-                                    current = 100;
-                                    clearInterval(backendInterval);
-                                }
-                                this.uploadProgress = Math.floor(current);
-                            }, duration / steps);
-                            setTimeout(() => {
-                                this.uploadProgress = 100;
-                                clearInterval(backendInterval);
-                                this.isUploading = false;
-                                this.message = `Successfully uploaded for ${this.companyName} on ${payload.date}`;
-                                this.messageType = 'success';
-                                this.file = null;
-                            }, 800);
-                        }).catch(err => {
-                            clearInterval(backendInterval);
-                            this.isUploading = false;
-                            console.error('Upload API error', err);
-                            this.setMsg(err.response?.data?.message || err.message, 'error');
-                        });
-                    };
-                    reader.onerror = e => {
-                        clearInterval(backendInterval);
-                        this.isUploading = false;
-                        console.error('FileReader error', e);
-                        this.setMsg('Failed to read file', 'error');
-                    };
-                    reader.readAsDataURL(this.file);
-                },
+  <script>
+    document.addEventListener('alpine:init', () => {
+      Alpine.data('uploaderApp', () => ({
+        // UI state
+        file: null,
+        message: '',
+        messageType: '',
+        userEmail: '',
+        companyName: '',
+        companyId: '',
+        isUploading: false,
+        isDragging: false,
+        uploadProgress: 0,
 
-                setMsg(msg, type) {
-                    this.message = msg;
-                    this.messageType = type;
-                }
-            }));
-        });
-    </script>
+        // Config
+        poolData: {
+          UserPoolId: 'eu-north-1_mjFO2q4Uv',
+          ClientId:   '1utjvfrjif09553uifhu8298cc'
+        },
+        identityPoolId:   'eu-north-1:e719a5c0-8093-4110-85ef-13519a8276b1',
+        companiesTableName: 'TransportCompanies',
+        prefix: 'uploads',
+        apiBaseUrl: 'https://ic8g1nc632.execute-api.eu-north-1.amazonaws.com/dev',
+        uploadUrlPath: '/upload-url',
+
+        init() {
+          AWS.config.region = 'eu-north-1';
+          this.userPool = new AmazonCognitoIdentity.CognitoUserPool(this.poolData);
+          const cur = this.userPool.getCurrentUser();
+          if (!cur) return window.location.href = 'index.html';
+
+          this.cognitoUser = cur;
+          cur.getSession(async (err, sess) => {
+            if (err || !sess.isValid()) return window.location.href = 'index.html';
+
+            // Decode token
+            const payload   = sess.getIdToken().decodePayload();
+            this.userEmail  = payload.email;
+            this.companyId  = payload['custom:companyId'] || '';
+
+            // Fetch company name
+            AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+              IdentityPoolId: this.identityPoolId,
+              Logins: {
+                [`cognito-idp.${AWS.config.region}.amazonaws.com/${this.poolData.UserPoolId}`]:
+                  sess.getIdToken().getJwtToken()
+              }
+            });
+            AWS.config.credentials.refresh(async credErr => {
+              if (credErr) return console.error('Credential error', credErr);
+              try {
+                const resp = await new AWS.DynamoDB.DocumentClient()
+                  .get({ TableName: this.companiesTableName, Key: { companyId: this.companyId } })
+                  .promise();
+                this.companyName = resp.Item?.name || '';
+              } catch (dbErr) {
+                console.error('Company fetch error', dbErr);
+              }
+            });
+          });
+        },
+
+        handleFileDrop(e) {
+          this.isDragging = false;
+          const [file] = e.dataTransfer.files;
+          if (file && this.validateFile(file)) {
+            this.file = file;
+            this.message = '';
+          }
+        },
+        handleFileSelect(e) {
+          const file = e.target.files[0];
+          if (file && this.validateFile(file)) {
+            this.file = file;
+            this.message = '';
+          }
+        },
+
+        validateFile(file) {
+          const validTypes = [
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          ];
+          const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+          if (!['.xls','.xlsx'].includes(ext) || !validTypes.includes(file.type)) {
+            return this.setMsg('Please select a valid Excel file (.xlsx or .xls)', 'error'), false;
+          }
+          if (file.size > 10*1024*1024) {
+            return this.setMsg('File size exceeds 10MB limit','error'), false;
+          }
+          return true;
+        },
+
+        formatFileSize(bytes) {
+          if (!bytes) return '0 Bytes';
+          const k=1024, sizes=['Bytes','KB','MB','GB'], i=Math.floor(Math.log(bytes)/Math.log(k));
+          return `${(bytes/Math.pow(k,i)).toFixed(2)} ${sizes[i]}`;
+        },
+
+        signOut() {
+          this.cognitoUser?.signOut();
+          try { AWS.config.credentials?.clearCachedId(); } catch {}
+          window.location.href='index.html';
+        },
+
+        async uploadFile() {
+          if (!this.file) return this.setMsg('Please select a file first','error');
+          const session = this.cognitoUser.getSignInUserSession();
+          if (!session || !session.isValid()) return this.setMsg('Session expired—please sign in','error');
+
+          this.isUploading = true;
+          this.uploadProgress = 0;
+          try {
+            // 1) Get presigned POST
+            const token = session.getIdToken().getJwtToken();
+            const res   = await axios.get(
+              `${this.apiBaseUrl}${this.uploadUrlPath}`,
+              { headers: { Authorization: token } }
+            );
+            const postData = res.data;
+
+            // 2) Build form
+            const form = new FormData();
+            Object.entries(postData.fields).forEach(([k,v]) => {
+              if (k!=='key') form.append(k,v);
+            });
+            form.append('key', `${this.prefix}/${this.companyId}/${this.file.name}`);
+            form.append('file', this.file);
+
+            // 3) Upload directly to S3
+            await axios.post(postData.url, form, {
+              onUploadProgress: e => {
+                this.uploadProgress = Math.round((e.loaded/e.total)*100);
+              }
+            });
+
+            // 4) Done
+            this.isUploading = false;
+            this.uploadProgress = 100;
+            this.setMsg(`Successfully queued upload “${this.file.name}”`,`success`);
+            this.file = null;
+
+          } catch (err) {
+            console.error('Upload error', err);
+            this.setMsg(err.message || 'Upload failed','error');
+            this.isUploading = false;
+          }
+        },
+
+        setMsg(msg, type='error') {
+          this.message = msg;
+          this.messageType = type;
+        }
+      }));
+    });
+  </script>
 </body>
-
 </html>
