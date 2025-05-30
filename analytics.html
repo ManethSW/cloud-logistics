@@ -5,40 +5,41 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Analytics Dashboard – Logistics</title>
+
+    <!-- Cognito & AWS SDK -->
     <script
         src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6/dist/amazon-cognito-identity.min.js"></script>
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1488.0.min.js"></script>
+
+    <!-- Alpine.js & Axios -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios@0.21.1/dist/axios.min.js"></script>
+
+    <!-- Tailwind & Font Awesome -->
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
     <style>
         [x-cloak] {
-            display: none !important;
+            display: none !important
         }
 
         @keyframes spin {
             to {
-                transform: rotate(360deg);
+                transform: rotate(360deg)
             }
         }
 
         .spin-animation {
-            animation: spin 1s linear infinite;
-        }
-
-        .fade-enter-active,
-        .fade-leave-active {
-            transition: opacity 0.3s;
-        }
-
-        .fade-enter,
-        .fade-leave-to {
-            opacity: 0;
+            animation: spin 1s linear infinite
         }
     </style>
 </head>
 
 <body class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-    <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-lg transition-all">
+    <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-lg">
+
+        <!-- Header -->
         <div class="flex items-center justify-between mb-6">
             <div>
                 <h1 class="text-2xl font-bold text-gray-800">Logistics Analytics</h1>
@@ -53,25 +54,34 @@
             </div>
         </div>
 
-        <div class="flex flex-col items-center justify-center">
-            
-            <div class="flex space-x-3 w-full justify-center">
-                <button @click="goToQuickSightDashboard"
-                    class="flex-1 bg-blue-600 text-white font-medium py-3 px-4 rounded-lg hover:bg-blue-700 transition flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                    <span>Go to Dashboard</span>
-                </button>
-                <button :disabled="isLoading" @click="signOut"
-                    class="bg-gray-200 text-gray-700 font-medium py-3 px-5 rounded-lg hover:bg-gray-300 transition flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                    <i class="fas fa-sign-out-alt"></i>
-                    <svg x-show="isLoading" class="w-5 h-5 spin-animation text-gray-700 ml-2" fill="none"
-                        viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
-                        </circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                    </svg>
-                </button>
-            </div>
+        <!-- Actions -->
+        <div class="flex space-x-3 w-full justify-center mb-4">
+            <!-- Open QuickSight -->
+            <button @click="goToQuickSightDashboard"
+                class="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition flex items-center justify-center space-x-2">
+                <span>Go to Dashboard</span>
+            </button>
+
+            <!-- Trigger SPICE Refresh -->
+            <button @click="refreshAnalytics" :disabled="isRefreshing"
+                class="bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition flex items-center justify-center space-x-2 disabled:opacity-50">
+                <span x-text="isRefreshing ? 'Refreshing…' : 'Refresh Analytics'"></span>
+                <i x-show="isRefreshing" class="fas fa-sync spin-animation"></i>
+            </button>
+
+            <!-- Sign Out -->
+            <button @click="signOut" :disabled="isLoading"
+                class="bg-gray-200 text-gray-700 py-3 px-5 rounded-lg hover:bg-gray-300 transition flex items-center justify-center space-x-2 disabled:opacity-50">
+                <i class="fas fa-sign-out-alt"></i>
+            </button>
         </div>
+
+        <!-- Optional feedback message -->
+        <div x-show="message" class="mt-4 text-center text-sm"
+            :class="messageType === 'error' ? 'text-red-600' : 'text-green-600'">
+            <span x-text="message"></span>
+        </div>
+
     </div>
 
     <script>
@@ -80,40 +90,67 @@
                 userEmail: '',
                 cognitoUser: null,
                 isLoading: false,
-                quickSightAccountName: 'LogisticsPortalQS',
+                isRefreshing: false,
+                message: '',
+                messageType: 'success',
+
+                // QuickSight & API config
                 quickSightRegion: 'eu-north-1',
                 dashboardId: '8c31d9a7-1367-4a7c-b14e-873a650b7165',
+                quickSightAccountName: 'LogisticsPortalQS',
+                apiBaseUrl: 'https://ic8g1nc632.execute-api.eu-north-1.amazonaws.com/dev',
+                refreshPath: '/refresh-analytics',
+
                 poolData: {
                     UserPoolId: 'eu-north-1_mjFO2q4Uv',
                     ClientId: '1utjvfrjif09553uifhu8298cc'
                 },
+
                 init() {
+                    // Authenticate
+                    AWS.config.region = 'eu-north-1';
                     this.userPool = new AmazonCognitoIdentity.CognitoUserPool(this.poolData);
                     const cur = this.userPool.getCurrentUser();
                     if (!cur) return window.location.href = 'index.html';
                     this.cognitoUser = cur;
-                    cur.getSession((e, s) => {
-                        if (e || !s.isValid()) return window.location.href = 'index.html';
-                        const payload = s.getIdToken().decodePayload();
-                        const groups = payload['cognito:groups'] || [];
-                        if (!groups.includes('LogisticsAdmins')) return window.location.href = 'uploader.html';
+                    cur.getSession((err, sess) => {
+                        if (err || !sess.isValid()) return window.location.href = 'index.html';
+                        const payload = sess.getIdToken().decodePayload();
+                        if (!(payload['cognito:groups'] || []).includes('LogisticsAdmins'))
+                            return window.location.href = 'uploader.html';
                         this.userEmail = payload.email;
                     });
                 },
+
                 goToQuickSightDashboard() {
                     const url = `https://${this.quickSightRegion}.quicksight.aws.amazon.com/sn/dashboards/${this.dashboardId}?directory_alias=${this.quickSightAccountName}`;
                     window.open(url, '_blank');
                 },
+
+                async refreshAnalytics() {
+                    this.isRefreshing = true;
+                    this.message = '';
+                    try {
+                        const session = this.cognitoUser.getSignInUserSession();
+                        const token = session.getIdToken().getJwtToken();
+                        const res = await axios.get(`${this.apiBaseUrl}${this.refreshPath}`, {
+                            headers: { Authorization: token }
+                        });
+                        this.message = res.data.message || 'Refresh triggered';
+                        this.messageType = 'success';
+                    } catch (e) {
+                        console.error(e);
+                        this.message = e.response?.data?.message || 'Refresh failed';
+                        this.messageType = 'error';
+                    } finally {
+                        this.isRefreshing = false;
+                    }
+                },
+
                 signOut() {
                     this.isLoading = true;
                     this.cognitoUser?.signOut();
-                    try {
-                        if (window.AWS && window.AWS.config.credentials) {
-                            window.AWS.config.credentials.clearCachedId();
-                        }
-                    } catch (e) {
-                        console.error("Error clearing credentials:", e);
-                    }
+                    try { AWS.config.credentials.clearCachedId(); } catch { }
                     window.location.href = 'index.html';
                 }
             }));
