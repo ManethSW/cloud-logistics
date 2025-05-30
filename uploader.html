@@ -19,22 +19,57 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 
   <style>
-    [x-cloak] { display: none !important; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .spin-animation { animation: spin 1s linear infinite; }
-    .dropzone { border: 2px dashed #cbd5e0; transition: all 0.3s; }
-    .dropzone-active { border-color: #4299e1; background-color: #ebf8ff; }
-    .file-input-hidden { width:0.1px; height:0.1px; opacity:0; overflow:hidden; position:absolute; z-index:-1; }
-    .progress-bar { transition: width 0.3s ease; }
-    .fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
-    .fade-enter, .fade-leave-to { opacity: 0; }
+    [x-cloak] {
+      display: none !important;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .spin-animation {
+      animation: spin 1s linear infinite;
+    }
+
+    .dropzone {
+      border: 2px dashed #cbd5e0;
+      transition: all 0.3s;
+    }
+
+    .dropzone-active {
+      border-color: #4299e1;
+      background-color: #ebf8ff;
+    }
+
+    .file-input-hidden {
+      width: 0.1px;
+      height: 0.1px;
+      opacity: 0;
+      overflow: hidden;
+      position: absolute;
+      z-index: -1;
+    }
+
+    .progress-bar {
+      transition: width 0.3s ease;
+    }
+
+    .fade-enter-active,
+    .fade-leave-active {
+      transition: opacity 0.3s;
+    }
+
+    .fade-enter,
+    .fade-leave-to {
+      opacity: 0;
+    }
   </style>
 </head>
 
 <body class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
   <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-lg transition-all">
-
-    <!-- Header -->
     <div class="flex items-center justify-between mb-6">
       <div>
         <h1 class="text-2xl font-bold text-gray-800">Excel Uploader</h1>
@@ -49,30 +84,23 @@
         <span class="text-xs text-gray-500" x-text="userEmail"></span>
       </div>
     </div>
-
-    <!-- Dropzone -->
-    <div class="dropzone rounded-lg p-6 text-center mb-6" 
-         :class="{ 'dropzone-active': isDragging }"
-         x-on:dragover.prevent="isDragging = true" 
-         x-on:dragleave.prevent="isDragging = false"
-         x-on:drop.prevent="handleFileDrop($event)">
-      <input id="file-upload" type="file" accept=".xlsx,.xls" 
-             @change="handleFileSelect($event)" 
-             class="file-input-hidden" />
-
+    <div class="dropzone rounded-lg p-6 text-center mb-6" :class="{ 'dropzone-active': isDragging }"
+      x-on:dragover.prevent="isDragging = true" x-on:dragleave.prevent="isDragging = false"
+      x-on:drop.prevent="handleFileDrop($event)">
+      <input id="file-upload" type="file" accept=".xlsx,.xls" @change="handleFileSelect($event)"
+        class="file-input-hidden" />
       <template x-if="!file">
         <div class="py-6">
           <i class="fas fa-file-excel text-4xl text-gray-300 mb-3"></i>
           <h3 class="font-medium text-gray-700 mb-2">Drop your Excel file here</h3>
           <p class="text-gray-500 text-sm mb-3">or</p>
           <label for="file-upload"
-                 class="bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-2 rounded-lg cursor-pointer transition-colors">
+            class="bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-2 rounded-lg cursor-pointer transition-colors">
             Browse files
           </label>
           <p class="text-xs text-gray-400 mt-3">Only .xlsx and .xls files allowed</p>
         </div>
       </template>
-
       <template x-if="file">
         <div class="flex items-center p-4 bg-gray-50 rounded-lg">
           <i class="fas fa-file-excel text-green-500 text-xl mr-3"></i>
@@ -86,49 +114,38 @@
         </div>
       </template>
     </div>
-
-    <!-- Progress -->
     <div x-show="isUploading" class="mb-6">
       <div class="flex justify-between text-xs text-gray-600 mb-1">
         <span>Uploading...</span>
         <span x-text="uploadProgress + '%'"></span>
       </div>
       <div class="w-full bg-gray-200 rounded-full h-2">
-        <div class="bg-green-500 h-2 rounded-full progress-bar" 
-             :style="`width: ${uploadProgress}%`"></div>
+        <div class="bg-green-500 h-2 rounded-full progress-bar" :style="`width: ${uploadProgress}%`"></div>
       </div>
     </div>
-
-    <!-- Actions -->
     <div class="flex space-x-3">
-      <button :disabled="isUploading || !file" @click="uploadFile"
-              class="flex-1 bg-green-600 text-white font-medium py-3 px-4 rounded-lg 
+      <button :disabled="isUploading || !file" @click="uploadFile" class="flex-1 bg-green-600 text-white font-medium py-3 px-4 rounded-lg 
                      hover:bg-green-700 transition flex items-center justify-center space-x-2
                      disabled:opacity-50 disabled:cursor-not-allowed">
         <span>Upload File</span>
         <i x-show="isUploading" class="fas fa-circle-notch spin-animation ml-2"></i>
       </button>
       <button @click="signOut"
-              class="bg-gray-200 text-gray-700 font-medium py-3 px-5 rounded-lg hover:bg-gray-300 transition">
+        class="bg-gray-200 text-gray-700 font-medium py-3 px-5 rounded-lg hover:bg-gray-300 transition">
         <i class="fas fa-sign-out-alt"></i>
       </button>
     </div>
-
-    <!-- Status Message -->
     <div x-show="message" x-transition:enter="fade-enter-active" x-transition:leave="fade-leave-active"
-         class="mt-4 p-3 rounded-lg text-sm flex items-start"
-         :class="messageType==='error' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'">
-      <i class="mt-0.5 mr-2"
-         :class="messageType==='error' ? 'fas fa-exclamation-circle' : 'fas fa-check-circle'"></i>
+      class="mt-4 p-3 rounded-lg text-sm flex items-start"
+      :class="messageType==='error' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'">
+      <i class="mt-0.5 mr-2" :class="messageType==='error' ? 'fas fa-exclamation-circle' : 'fas fa-check-circle'"></i>
       <span x-text="message"></span>
     </div>
-
   </div>
 
   <script>
     document.addEventListener('alpine:init', () => {
       Alpine.data('uploaderApp', () => ({
-        // UI state
         file: null,
         message: '',
         messageType: '',
@@ -139,12 +156,11 @@
         isDragging: false,
         uploadProgress: 0,
 
-        // Config
         poolData: {
           UserPoolId: 'eu-north-1_mjFO2q4Uv',
-          ClientId:   '1utjvfrjif09553uifhu8298cc'
+          ClientId: '1utjvfrjif09553uifhu8298cc'
         },
-        identityPoolId:   'eu-north-1:e719a5c0-8093-4110-85ef-13519a8276b1',
+        identityPoolId: 'eu-north-1:e719a5c0-8093-4110-85ef-13519a8276b1',
         companiesTableName: 'TransportCompanies',
         prefix: 'uploads',
         apiBaseUrl: 'https://ic8g1nc632.execute-api.eu-north-1.amazonaws.com/dev',
@@ -160,12 +176,10 @@
           cur.getSession(async (err, sess) => {
             if (err || !sess.isValid()) return window.location.href = 'index.html';
 
-            // Decode token
-            const payload   = sess.getIdToken().decodePayload();
-            this.userEmail  = payload.email;
-            this.companyId  = payload['custom:companyId'] || '';
+            const payload = sess.getIdToken().decodePayload();
+            this.userEmail = payload.email;
+            this.companyId = payload['custom:companyId'] || '';
 
-            // Fetch company name
             AWS.config.credentials = new AWS.CognitoIdentityCredentials({
               IdentityPoolId: this.identityPoolId,
               Logins: {
@@ -209,77 +223,78 @@
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
           ];
           const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
-          if (!['.xls','.xlsx'].includes(ext) || !validTypes.includes(file.type)) {
+          if (!['.xls', '.xlsx'].includes(ext) || !validTypes.includes(file.type)) {
             return this.setMsg('Please select a valid Excel file (.xlsx or .xls)', 'error'), false;
           }
-          if (file.size > 10*1024*1024) {
-            return this.setMsg('File size exceeds 10MB limit','error'), false;
+          if (file.size > 10 * 1024 * 1024) {
+            return this.setMsg('File size exceeds 10MB limit', 'error'), false;
           }
           return true;
         },
 
         formatFileSize(bytes) {
           if (!bytes) return '0 Bytes';
-          const k=1024, sizes=['Bytes','KB','MB','GB'], i=Math.floor(Math.log(bytes)/Math.log(k));
-          return `${(bytes/Math.pow(k,i)).toFixed(2)} ${sizes[i]}`;
+          const k = 1024, sizes = ['Bytes', 'KB', 'MB', 'GB'], i = Math.floor(Math.log(bytes) / Math.log(k));
+          return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
         },
 
         signOut() {
           this.cognitoUser?.signOut();
-          try { AWS.config.credentials?.clearCachedId(); } catch {}
-          window.location.href='index.html';
+          try { AWS.config.credentials?.clearCachedId(); } catch { }
+          window.location.href = 'index.html';
         },
 
         async uploadFile() {
-          if (!this.file) return this.setMsg('Please select a file first','error');
+          if (!this.file) return this.setMsg('Please select a file first', 'error');
           const session = this.cognitoUser.getSignInUserSession();
-          if (!session || !session.isValid()) return this.setMsg('Session expired—please sign in','error');
+          if (!session || !session.isValid()) return this.setMsg('Session expired—please sign in', 'error');
 
           this.isUploading = true;
           this.uploadProgress = 0;
           try {
-            // 1) Get presigned POST
             const token = session.getIdToken().getJwtToken();
-            const res   = await axios.get(
+            const res = await axios.get(
               `${this.apiBaseUrl}${this.uploadUrlPath}`,
               { headers: { Authorization: token } }
             );
             const postData = res.data;
 
-            // 2) Build form
             const form = new FormData();
-            Object.entries(postData.fields).forEach(([k,v]) => {
-              if (k!=='key') form.append(k,v);
+            Object.entries(postData.fields).forEach(([k, v]) => {
+              if (k !== 'key') form.append(k, v);
             });
             form.append('key', `${this.prefix}/${this.companyId}/${this.file.name}`);
             form.append('file', this.file);
 
-            // 3) Upload directly to S3
             await axios.post(postData.url, form, {
               onUploadProgress: e => {
-                this.uploadProgress = Math.round((e.loaded/e.total)*100);
+                this.uploadProgress = Math.round((e.loaded / e.total) * 100);
               }
             });
 
-            // 4) Done
             this.isUploading = false;
             this.uploadProgress = 100;
-            this.setMsg(`Successfully queued upload “${this.file.name}”`,`success`);
+            this.setMsg(`Successfully queued upload “${this.file.name}”`, `success`);
             this.file = null;
 
           } catch (err) {
             console.error('Upload error', err);
-            this.setMsg(err.message || 'Upload failed','error');
+            this.setMsg(err.message || 'Upload failed', 'error');
             this.isUploading = false;
           }
         },
 
-        setMsg(msg, type='error') {
+        setMsg(msg, type = 'error') {
           this.message = msg;
           this.messageType = type;
+          if (this._msgTimeout) clearTimeout(this._msgTimeout);
+          this._msgTimeout = setTimeout(() => {
+            this.message = '';
+          }, 4000);
         }
       }));
     });
   </script>
 </body>
+
 </html>
