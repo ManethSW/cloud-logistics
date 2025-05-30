@@ -133,9 +133,11 @@
                     try {
                         const session = this.cognitoUser.getSignInUserSession();
                         const token = session.getIdToken().getJwtToken();
-                        const res = await axios.get(`${this.apiBaseUrl}${this.refreshPath}`, {
-                            headers: { Authorization: token }
-                        });
+                        const res = await axios.post(
+                            `${this.apiBaseUrl}${this.refreshPath}`,
+                            {},
+                            { headers: { Authorization: token } }
+                        );
                         this.message = res.data.message || 'Refresh triggered';
                         this.messageType = 'success';
                     } catch (e) {
