@@ -6,32 +6,27 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Analytics Dashboard – Logistics</title>
 
-    <!-- Cognito & AWS SDK -->
     <script
         src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6/dist/amazon-cognito-identity.min.js"></script>
     <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1488.0.min.js"></script>
-
-    <!-- Alpine.js & Axios -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios@0.21.1/dist/axios.min.js"></script>
-
-    <!-- Tailwind & Font Awesome -->
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 
     <style>
         [x-cloak] {
-            display: none !important
+            display: none !important;
         }
 
         @keyframes spin {
             to {
-                transform: rotate(360deg)
+                transform: rotate(360deg);
             }
         }
 
         .spin-animation {
-            animation: spin 1s linear infinite
+            animation: spin 1s linear infinite;
         }
     </style>
 </head>
@@ -51,21 +46,23 @@
                 <span class="text-sm font-medium text-blue-600" x-text="userEmail"></span>
             </div>
         </div>
+
         <div class="flex space-x-3 w-full justify-center">
             <button @click="goToQuickSightDashboard"
                 class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition flex items-center justify-center space-x-2">
                 <span>Go to Dashboard</span>
             </button>
             <button @click="refreshAnalytics" :disabled="isRefreshing"
-                class="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition flex items-center justify-center space-x-2 disabled:opacity-50">
+                class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition flex items-center justify-center space-x-2 disabled:opacity-50">
                 <span x-text="isRefreshing ? 'Refreshing…' : 'Refresh Analytics'"></span>
                 <i x-show="isRefreshing" class="fas fa-sync spin-animation"></i>
             </button>
             <button @click="signOut" :disabled="isLoading"
-                class="bg-gray-200 text-gray-700 py-3 px-5 rounded-lg hover:bg-gray-300 transition flex items-center justify-center space-x-2 disabled:opacity-50">
+                class="bg-gray-200 text-gray-700 py-3 px-5 rounded-lg hover:bg-gray-300 transition flex items-center justify-center">
                 <i class="fas fa-sign-out-alt"></i>
             </button>
         </div>
+
         <div x-show="message" class="mt-4 text-center text-sm"
             :class="messageType === 'error' ? 'text-red-600' : 'text-green-600'">
             <span x-text="message"></span>
@@ -94,7 +91,6 @@
                 },
 
                 init() {
-                    // Authenticate
                     AWS.config.region = 'eu-north-1';
                     this.userPool = new AmazonCognitoIdentity.CognitoUserPool(this.poolData);
                     const cur = this.userPool.getCurrentUser();
