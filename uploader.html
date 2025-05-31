@@ -257,6 +257,7 @@
             const key = `${this.prefix}/${this.companyId}/${this.uploadDate}.${ext}`;
             form.append('key', key);
             form.append('file', this.file);
+            form.append('x-amz-meta-uploader', this.userEmail);
 
             await axios.post(postData.url, form, {
               onUploadProgress: e => {
