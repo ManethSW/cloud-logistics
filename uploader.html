@@ -286,6 +286,7 @@
 
             this.setMsg(`Uploaded ${this.uploadDate}.${ext}`, 'success');
             this.file = null;
+            this.uploadDate = '';
           } catch (err) {
             console.error(err);
             this.setMsg('Upload failed', 'error');
