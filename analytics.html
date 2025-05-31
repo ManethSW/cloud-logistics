@@ -50,12 +50,13 @@
         <div class="flex space-x-3 w-full justify-center">
             <button @click="goToQuickSightDashboard"
                 class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition flex items-center justify-center space-x-2">
-                <span>Go to Dashboard</span>
+                <i class="fas fa-chart-line"></i>
+                <span>Dashboard</span>
             </button>
             <button @click="refreshAnalytics" :disabled="isRefreshing"
                 class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition flex items-center justify-center space-x-2 disabled:opacity-50">
+                <i class="fas fa-sync" :class="isRefreshing ? 'spin-animation' : ''"></i>
                 <span x-text="isRefreshing ? 'Refreshing…' : 'Refresh Analytics'"></span>
-                <i x-show="isRefreshing" class="fas fa-sync spin-animation"></i>
             </button>
             <button @click="signOut" :disabled="isLoading"
                 class="bg-gray-200 text-gray-700 py-3 px-5 rounded-lg hover:bg-gray-300 transition flex items-center justify-center">
